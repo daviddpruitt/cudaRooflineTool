@@ -96,7 +96,7 @@ metricNames = {"flop_count_dp"         :"dp flops",
 
 combinedMetrics = {"g_throughput":      ["gld_throughput", "gst_throughput"],
                    "local_throughput":  ["local_load_throughput", "local_store_throughput"],
-                   "s_throughput":      ["shared_load_throughput", "shared_store_throughput"],
+                   "shared_throughput": ["shared_load_throughput", "shared_store_throughput"],
                    "l2_throughput":     ["l2_read_throughput", "l2_write_throughput"],
                    "dram_throughput":   ["dram_read_throughput", "dram_write_throughput"]}
 
@@ -105,7 +105,7 @@ rooflineMetricsFlops = ["flop_count_dp",
                         "flop_count_sp",
                         "flop_count_hp"]
 
-rooflineMetricsMem = ["s_bytes",
+rooflineMetricsMem = ["shared_bytes",
                       "l2_bytes",
                       "dram_bytes"]
 
@@ -308,17 +308,30 @@ def generateRooflinePoints(kernelMetrics):
 
         flopsMetric = max(flops, key=flops.get)
 
-        duration    = statistics.mean(kernelMetrics[kernel]["Duration"])
-        flops       = statistics.mean(kernelMetrics[kernel][flopsMetric])
-        flopsPerSec = flops / duration
+        durationList    = kernelMetrics[kernel]["Duration"]
+        flopsList       = kernelMetrics[kernel][flopsMetric]
+        # really should use numpy for this but some systems don't have it installed
+        flopsPerSecList = [flops / duration for flops, duration in zip(flopsList, durationList)]
+
+        #[flops / duration for flops, duration in zip
 
         # calculate intensity for each memory type
         # and add it to the list
         for memMetric in rooflineMetricsMem:
             if memMetric in kernelMetrics[kernel]:
-                intensity = flops / statistics.mean(kernelMetrics[kernel][memMetric])
+                #intensity = flops / statistics.mean(kernelMetrics[kernel][memMetric])
+                intensityList = [flops / data for flops, data in  zip (flopsList, kernelMetrics[kernel][memMetric])]
+                #intensityList = flopsList / np.array(kernelMetrics[kernel][memMetric])
                 kernelName = metricNames[memMetric] + " " + kernel
-                rooflines[kernelName] = [intensity, flopsPerSec]
+
+                intensityStdDev = 0
+                flopsPerSecStdDev = 0
+                if len(intensityList) > 1:
+                    intensityStdDev = statistics.stdev(intensityList)
+                    flopsPerSecStdDev = statistics.stdev(flopsPerSecList)
+
+                rooflines[kernelName] = [statistics.mean(intensityList),  statistics.mean(flopsPerSecList),
+                                         intensityStdDev, flopsPerSecStdDev]
 
     return rooflines
 
@@ -426,7 +439,8 @@ def generateRooflinesCSV(rooflines, kernelMetrics, modelName):
             if kernel in roofline:
                 csvFileName = modelName + "_" + formatKernel(kernel) + ".csv"
                 with open(csvFileName, 'a', newline='') as csvfile:
-                    csvfile.write("{},{},{}\n".format(rooflines[roofline][0], rooflines[roofline][1] / 1.0e9, formatKernel((roofline)[:25])))
+                    csvfile.write("{},{},{},{},{}\n".format(rooflines[roofline][0], rooflines[roofline][1] / 1.0e9,
+                                                            rooflines[roofline][2], rooflines[roofline][2] / 1.0e9, formatKernel((roofline)[:25])))
 
 logging.basicConfig(level=logging.INFO)
 

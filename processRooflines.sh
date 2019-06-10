@@ -29,8 +29,8 @@ do
 	echo '' >> ${outputFile}
  	
 	# add in the replot command
-	echo "replot \"${csvFile}\" with points ls 1 notitle noenhanced \\" >> ${outputFile}
-	echo "	,''	with labels center offset 0, 1 notitle noenhanced" >> ${outputFile}
+	echo "replot \"${csvFile}\" with xyerrorbars ls 1 notitle noenhanced \\" >> ${outputFile}
+	echo "	,''	using 1:2:5 with labels rotate by 35 oenter offset 0, 1 notitle noenhanced" >> ${outputFile}
 	echo "" >> ${outputFile} 
 
 	# and the pause command
