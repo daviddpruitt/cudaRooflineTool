@@ -94,6 +94,40 @@ metricNames = {"flop_count_dp"         :"dp flops",
                "dram_write_bytes"      :"memory writes",
                "dram_bytes"            :"memory"}
 
+abbrMetricNames = {"flop_count_dp"         :"dp",
+		   "flop_count_sp"         :"sp",
+		   "flop_count_hp"         :"hp",
+		   "gld_throughput"        :"global load",
+		   "gst_throughput"        :"global store",
+		   "g_throughput"          :"global",
+		   "local_load_throughput" :"local load",
+		   "local_store_throughput":"local store",
+		   "local_throughput"      :"local",
+		   "shared_load_throughput":"shared load",
+		   "shared_load_throughput":"shared store",
+		   "shared_throughput"     :"shared",
+		   "l2_read_throughput"    :"l2 read",
+		   "l2_read_throughput"    :"l2 write",
+		   "l2_throughput"         :"l2",
+		   "dram_read_throughput"  :"memory read",
+		   "dram_write_throughput" :"memory write",
+		   "dram_throughput"       :"memory",
+		   "gld_bytes"             :"global loads",
+		   "gst_bytes"             :"global stores",
+		   "g_bytes"               :"global bytes",
+		   "local_load_bytes"      :"local loads",
+		   "local_store_bytes"     :"local stores",
+		   "local_bytes"           :"local bytes",
+		   "shared_load_bytes"     :"shared loads",
+		   "shared_store_bytes"    :"shared stores",
+		   "shared_bytes"          :"shared bytes",
+		   "l2_read_bytes"         :"l2 reads",
+		   "l2_write_bytes"        :"l2 writes",
+		   "l2_bytes"              :"l2 bytes",
+		   "dram_read_bytes"       :"memory reads",
+		   "dram_write_bytes"      :"memory writes",
+		   "dram_bytes"            :"memory"}
+
 combinedMetrics = {"g_throughput":      ["gld_throughput", "gst_throughput"],
                    "local_throughput":  ["local_load_throughput", "local_store_throughput"],
                    "shared_throughput": ["shared_load_throughput", "shared_store_throughput"],
@@ -156,7 +190,10 @@ def formatKernel(stringToStrip):
     newString = underscores.sub('_', stringToStrip)
     stringToStrip = newString
     newSTring = underscores.sub('_', stringToStrip)
-
+    stringToStrip = newString
+    newSTring = underscores.sub('_', stringToStrip)
+    if newString[-1] == "_":
+        newString = newString[:-1]
     return newString
 
 def FormatUnits(value, baseTwo=False, baseUnit=''):
@@ -320,9 +357,9 @@ def generateRooflinePoints(kernelMetrics):
         for memMetric in rooflineMetricsMem:
             if memMetric in kernelMetrics[kernel]:
                 #intensity = flops / statistics.mean(kernelMetrics[kernel][memMetric])
-                intensityList = [flops / data for flops, data in  zip (flopsList, kernelMetrics[kernel][memMetric])]
+                intensityList = [flops / data if data > 0 else 0 for flops, data in  zip (flopsList, kernelMetrics[kernel][memMetric])]
                 #intensityList = flopsList / np.array(kernelMetrics[kernel][memMetric])
-                kernelName = metricNames[memMetric] + " " + kernel
+                kernelName = abbrMetricNames[memMetric] + " " + abbrMetricNames[flopsMetric] + " " + kernel
 
                 intensityStdDev = 0
                 flopsPerSecStdDev = 0
