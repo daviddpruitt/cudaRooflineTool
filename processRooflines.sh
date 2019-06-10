@@ -2,7 +2,7 @@
 
 if [ "$#" -ne 3 ]
 then
-	echo 'Usage $0 <gnuplot template file> <directory with roofline data> <output directory>'
+	echo "Usage ${0} <gnuplot template file> <directory with roofline data> <output directory>"
 	exit
 fi
 
@@ -30,7 +30,7 @@ do
  	
 	# add in the replot command
 	echo "replot \"${csvFile}\" with xyerrorbars ls 1 notitle noenhanced \\" >> ${outputFile}
-	echo "	,''	using 1:2:5 with labels rotate by 35 oenter offset 0, 1 notitle noenhanced" >> ${outputFile}
+	echo "	,''	using 1:2:5 with labels rotate by 35 center offset 0, 1 notitle noenhanced" >> ${outputFile}
 	echo "" >> ${outputFile} 
 
 	# and the pause command
