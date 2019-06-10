@@ -1,0 +1,45 @@
+# This roofline model was built using the aspen modeling toolset
+# several assumptions are built into these models:
+# 1) It assumes runtime predictions are accurate
+# 2) It assumes loads and stores are in bytes
+# 3) It assumes all flops are the same
+# if one or more of these assumptions are incorrect the model
+# will be incorrect
+
+
+max(a,b) = (a > b) ? a : b
+min(a,b) = (a > b) ? b : a
+pow(a,b) = a ** b
+
+shared_bw(x) = x < 1.30579 ? x * 11998.2 : 1/0
+l2_bw(x) = x < 5.5974 ? x * 2799.01 : 1/0
+mem_bw(x) = x < 17.4458 ? x * 898.048 : 1/0
+
+dp_flops(x) = x > 0.326449 ? 3916.8 : 1/0
+dp_simd_fmad_flops(x) = x > 0.652897 ? 7833.6 : 1/0
+sp_simd_fmad_flops(x) = x > 1.30579 ? 15667.2 : 1/0
+# Using specified X range
+set xrange [0.25:32]
+
+# Using specified Y range
+set yrange [1000:100000]
+
+set logscale x 2
+set logscale y
+
+set key top left noenhanced
+# X Axis Label
+set xlabel "Flop:Byte Ratio"
+# Y Axis Label
+set ylabel "GFLOPS"
+set title "Achievable GFLOPS for nvidia v100 pcie 16gb on perflab" noenhanced
+
+plot mem_bw(x) with lines linewidth 2 ti "memory bw" noenhanced
+replot shared_bw(x) with lines linewidth 2 ti "shared bw" noenhanced
+replot l2_bw(x) with lines linewidth 2 ti "l2 bw" noenhanced
+replot dp_flops(x) with lines linewidth 2 ti "dp_flops" noenhanced
+replot dp_simd_fmad_flops(x) with lines linewidth 2 ti "dp_simd_fmad_flops" noenhanced
+replot sp_simd_fmad_flops(x) with lines linewidth 2 ti "sp_simd_fmad_flops" noenhanced
+
+
+pause -1 "hit any key to continue"
