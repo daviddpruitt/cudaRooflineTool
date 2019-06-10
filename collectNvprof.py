@@ -359,7 +359,7 @@ def generateRooflinePoints(kernelMetrics):
                 #intensity = flops / statistics.mean(kernelMetrics[kernel][memMetric])
                 intensityList = [flops / data if data > 0 else 0 for flops, data in  zip (flopsList, kernelMetrics[kernel][memMetric])]
                 #intensityList = flopsList / np.array(kernelMetrics[kernel][memMetric])
-                kernelName = abbrMetricNames[memMetric] + " " + abbrMetricNames[flopsMetric] + " " + kernel
+                kernelName = abbrMetricNames[memMetric] + " " + abbrMetricNames[flopsMetric] + "/" + kernel
                 print("kernel name {}".format(kernelName))
                 intensityStdDev = 0
                 flopsPerSecStdDev = 0
@@ -478,7 +478,7 @@ def generateRooflinesCSV(rooflines, kernelMetrics, modelName):
                 with open(csvFileName, 'a', newline='') as csvfile:
                     csvfile.write("{},{},{},{},{}\n".format(rooflines[roofline][0], rooflines[roofline][1] / 1.0e9,
                                                             rooflines[roofline][2], rooflines[roofline][2] / 1.0e9,
-                                                            roofline[:25].replace("_", " " )))
+                                                            roofline.split("/")[0].replace("_", " " )))
 
 logging.basicConfig(level=logging.INFO)
 
