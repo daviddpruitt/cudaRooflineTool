@@ -341,6 +341,7 @@ def generateRooflinePoints(kernelMetrics):
     """
 
     rooflines = dict()
+    memRooflines = dict()
 
     # one point for each kernel
     # runs are averaged
@@ -354,12 +355,27 @@ def generateRooflinePoints(kernelMetrics):
         if len(flops) == 0:
             continue
 
-        flopsMetric = max(flops, key=flops.get)
+        flopsMetric = max(flops, key=flops.get)	
+
+        # figure out which throughput is highest
+        throughput = dict()
+        for memMetric in rooflineMetricsMem:
+            if memMetric in kernelMetrics[kernel]:
+                throughput[memMetric] = statistics.mean(kernelMetrics[kernel][flopsMetric])
+
+        if len(throughput) == 0:
+            print("Throughput for {} empty skipping".format(kernel))
+            continue
+
+        print("metrics ok, moving on")
+        memMetric = max(throughput, key=throughput.get)
 
         durationList    = kernelMetrics[kernel]["Duration"]
         flopsList       = kernelMetrics[kernel][flopsMetric]
+        memList         = kernelMetrics[kernel][memMetric]
         # really should use numpy for this but some systems don't have it installed
         flopsPerSecList = [flops / duration for flops, duration in zip(flopsList, durationList)]
+        throughputList  = [mem   / duration for mem,   duration in zip(flopsList, memList)]
 
         #[flops / duration for flops, duration in zip
 
@@ -367,21 +383,27 @@ def generateRooflinePoints(kernelMetrics):
         # and add it to the list
         for memMetric in rooflineMetricsMem:
             if memMetric in kernelMetrics[kernel]:
+                print("working on {}".format(memMetric))
                 #intensity = flops / statistics.mean(kernelMetrics[kernel][memMetric])
                 intensityList = [flops / data if data > 0 else 0 for flops, data in  zip (flopsList, kernelMetrics[kernel][memMetric])]
+                invIntensityList = [data / flops if flops > 0 else 0 for flops, data in zip(flopsList, kernelMetrics[kernel][memMetric])]
                 #intensityList = flopsList / np.array(kernelMetrics[kernel][memMetric])
-                kernelName = abbrMetricNames[memMetric] + " " + abbrMetricNames[flopsMetric] + "/" + kernel
-                print("kernel name {}".format(kernelName))
+                flopsInfo = abbrMetricNames[memMetric] + " " + abbrMetricNames[flopsMetric] + "/" + kernel
+                #print("kernel info {}".format(flopsInfo))
                 intensityStdDev = 0
                 flopsPerSecStdDev = 0
                 if len(intensityList) > 1:
                     intensityStdDev = statistics.stdev(intensityList)
+                    invIntensityStdDev = statistics.stdev(invIntensityList)
                     flopsPerSecStdDev = statistics.stdev(flopsPerSecList)
+                    throughputStdDev = statistics.stdev(kernelMetrics[kernel][memMetric])
 
-                rooflines[kernelName] = [statistics.mean(intensityList),  statistics.mean(flopsPerSecList),
+                rooflines[flopsInfo] = [statistics.mean(intensityList),  statistics.mean(flopsPerSecList),
                                          intensityStdDev, flopsPerSecStdDev]
+                memRooflines[flopsInfo] = [statistics.mean(invIntensityList), statistics.mean(kernelMetrics[kernel][memMetric]),
+                                           invIntensityStdDev, throughputStdDev]
 
-    return rooflines
+    return rooflines, memRooflines
 
 def generateAspenModel(kernelMetrics, modelName=None, rooflines=None):
     """
@@ -481,21 +503,30 @@ def generateAspenModel(kernelMetrics, modelName=None, rooflines=None):
         # end of the model
         aspenFile.write("}\n")
 
-def generateRooflinesCSV(rooflines, kernelMetrics, modelName):
+def generateRooflinesCSV(rooflines, memRooflines, kernelMetrics, modelName):
+    logging.info("writing out roofline files")
     for kernel in kernelMetrics:
         for roofline in rooflines:
             if kernel in roofline:
                 formattedName = formatKernel(kernel, stripTypes=True, moveEnd=True)
                 print("Kernel {}".format(formattedName))
                 if len(formattedName) > 200:	
-                    csvFileName = modelName + "_" + formattedName[:150] + ".csv"
+                    csvFileName = modelName + "_" + formattedName[:200] + ".csv"
                 else:
                     csvFileName = modelName + "_" + formattedName + ".csv"
                 print("Final name {}".format(csvFileName))
+
                 with open(csvFileName, 'a', newline='') as csvfile:
                     csvfile.write("{},{},{},{},{}\n".format(rooflines[roofline][0], rooflines[roofline][1] / 1.0e9,
                                                             rooflines[roofline][2], rooflines[roofline][2] / 1.0e9,
                                                             roofline.split("/")[0].replace("_", " " )))
+        for memRoofline in rooflines:
+            if kernel in memRoofline:
+                csvFileName = modelName + "_" + formatKernel(kernel) + "_mem.csv"
+                with open(csvFileName, 'a', newline='') as csvfile:
+                    csvfile.write("{},{},{},{},{}\n".format(memRooflines[memRoofline][0], memRooflines[memRoofline][1] / 1.0e9,
+                                                            memRooflines[memRoofline][2], memRooflines[memRoofline][2] / 1.0e9,
+                                                            memRoofline.split("/")[0].replace("_", " " )))
 
 logging.basicConfig(level=logging.INFO)
 
@@ -518,30 +549,19 @@ for kernel in kernelMetrics:
 
 generateDerivedMetrics(kernelMetrics, statistics, throughputMetrics, countMetrics, combinedMetrics)
 
-rooflines = generateRooflinePoints(kernelMetrics)
+rooflines, memRooflines = generateRooflinePoints(kernelMetrics)
 
 aspenModelName = os.path.basename(sys.argv[1])
 generateAspenModel(kernelMetrics, aspenModelName, rooflines)
 
 #for kernel in kernelMetrics:
-#    continue
-#    if "Duration" in kernelMetrics[kernel] and kernelMetrics[kernel]["Duration"][0] != "":
-#        print(" duration {}".format(kernelMetrics[kernel]["Duration"]))
-#        duration = statistics.mean(kernelMetrics[kernel]["Duration"])
-#        print("Kernel {} Duration {}".format(kernel, duration))
-#        for metric in rooflineMetrics:
-#            if metric in kernelMetrics[kernel]:
-#                print("{} {}".format(metric, FormatUnits(statistics.mean(kernelMetrics[kernel][metric]))))
-#        for metric in metricNames:
-#       	    if metric in kernelMetrics[kernel]:
-#                print("{}".format(FormatUnits(statistics.mean( kernelMetrics[kernel][metric] ), baseUnit=metric + "/s")))
 
 print("List of kernels")
 for kernel in kernelMetrics:
     print("{}".format(kernel))
 
 
-generateRooflinesCSV(rooflines, kernelMetrics, aspenModelName)
+generateRooflinesCSV(rooflines, memRooflines, kernelMetrics, aspenModelName)
 print("Roofline points")
 for kernel in rooflines:
     print("{}  {}  flops/byte  {}  flops/sec".format(kernel, rooflines[kernel][0], rooflines[kernel][1]))

@@ -81,8 +81,13 @@ def processNvprofCSV(csvData, kernelMetrics = dict(), ignoreList = [], verbosePr
     """
 
     nonDataLines = 0
-
-    line = csvData[nonDataLines]
+    line = None
+    try:
+        line = csvData[nonDataLines]
+    except IndexError:
+        raise ValueError("Error loading datafile, data is empty: {}".format(csvData))
+    except Exception:
+        raise ValueError("Unkown error reading data {}\n{}".format(Exception,csvData))
     while not ("==" in line and "result:" in line):
         logging.debug("Consuming non-data line: {}".format(line))
         nonDataLines += 1
