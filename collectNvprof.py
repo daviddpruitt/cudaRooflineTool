@@ -181,8 +181,8 @@ def formatKernel(stringToStrip, splitParams = False, stripTypes = False, moveEnd
 
     # get rid of variable types
     if stripTypes:
-        types = re.compile('(void |bool |char |short |int |long |float |double |unsigned |signed |const )')
-        stringToStrip = types.sub('', stringToStrip)
+        types = re.compile('(\W(bool|char|short|int|long|float|double|unsigned|signed)\W|void|const)')
+        stringToStrip = types.sub('_', stringToStrip)
 
     # what's after the last > to the beginning
     # some frameworks put the actual name towards the
@@ -346,6 +346,7 @@ def generateRooflinePoints(kernelMetrics):
     # one point for each kernel
     # runs are averaged
     for kernel in kernelMetrics:
+        logging.debug("Starting roofline generation for kernel {}".format(kernel))
         # figure out which flops is highest
         flops = dict()
         for flopsMetric in rooflineMetricsFlops:
@@ -353,6 +354,7 @@ def generateRooflinePoints(kernelMetrics):
                 flops[flopsMetric] = statistics.mean(kernelMetrics[kernel][flopsMetric]) * flopsMultipliers[flopsMetric]
 
         if len(flops) == 0:
+            logging.debug("flops for {} empty skipping".format(kernel))
             continue
 
         flopsMetric = max(flops, key=flops.get)	
@@ -364,26 +366,25 @@ def generateRooflinePoints(kernelMetrics):
                 throughput[memMetric] = statistics.mean(kernelMetrics[kernel][flopsMetric])
 
         if len(throughput) == 0:
-            print("Throughput for {} empty skipping".format(kernel))
+            logging.debug("Throughput for {} empty skipping".format(kernel))
             continue
 
-        print("metrics ok, moving on")
         memMetric = max(throughput, key=throughput.get)
 
         durationList    = kernelMetrics[kernel]["Duration"]
         flopsList       = kernelMetrics[kernel][flopsMetric]
         memList         = kernelMetrics[kernel][memMetric]
         # really should use numpy for this but some systems don't have it installed
-        flopsPerSecList = [flops / duration for flops, duration in zip(flopsList, durationList)]
-        throughputList  = [mem   / duration for mem,   duration in zip(flopsList, memList)]
+        flopsPerSecList = [flops / duration if duration > 0 else 0 for flops, duration in zip(flopsList, durationList)]
+        throughputList  = [mem   / duration if duration > 0 else 0 for mem,   duration in zip(flopsList, memList)]
 
         #[flops / duration for flops, duration in zip
 
         # calculate intensity for each memory type
         # and add it to the list
         for memMetric in rooflineMetricsMem:
+            logging.debug("Working on memory metric {}".format(memMetric))
             if memMetric in kernelMetrics[kernel]:
-                print("working on {}".format(memMetric))
                 #intensity = flops / statistics.mean(kernelMetrics[kernel][memMetric])
                 intensityList = [flops / data if data > 0 else 0 for flops, data in  zip (flopsList, kernelMetrics[kernel][memMetric])]
                 invIntensityList = [data / flops if flops > 0 else 0 for flops, data in zip(flopsList, kernelMetrics[kernel][memMetric])]
@@ -522,7 +523,7 @@ def generateRooflinesCSV(rooflines, memRooflines, kernelMetrics, modelName):
                                                             roofline.split("/")[0].replace("_", " " )))
         for memRoofline in rooflines:
             if kernel in memRoofline:
-                csvFileName = modelName + "_" + formatKernel(kernel) + "_mem.csv"
+                csvFileName = modelName + "_" + formatKernel(kernel, stripTypes=True, moveEnd=True) + "_mem.csv"
                 with open(csvFileName, 'a', newline='') as csvfile:
                     csvfile.write("{},{},{},{},{}\n".format(memRooflines[memRoofline][0], memRooflines[memRoofline][1] / 1.0e9,
                                                             memRooflines[memRoofline][2], memRooflines[memRoofline][2] / 1.0e9,
