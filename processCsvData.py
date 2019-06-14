@@ -1,6 +1,39 @@
 import csv
 import re
 import logging
+import subprocess
+
+
+def demangle(name):
+    """ 
+    demangles function names, uses the demangle program
+    rather than a demangle module since it isn't accessible on 
+    some systems
+    """
+    command = ['c++filt']
+    command.append( name )
+    logging.debug(":processCsv:demangle c++ filt command {}<".format(command))
+    pipes = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    std_out, std_err = pipes.communicate()
+
+    if (pipes.returncode != 0):
+        print("Error executing command {0}, return code {1}, exiting...".format(command, pipes.returncode))
+        exit(1)
+
+    # print("stdout {}".format(std_out.decode()))
+    logging.debug(":processCsv:demangle stdout from demangle {}".format(std_out.decode()))
+    demangled = std_out.decode().split("\n")
+
+    if (demangled[0][:2] == "_Z"):
+        print("Error, name was not demangled properly")
+        print("Command used: {}".format(command))
+        print("Result: {}". std_out.decode())
+
+    # Each line ends with a newline, so the final entry of the split output
+    # will always be ''.
+    logging.debug(":processCsv:demangle demangled {}".format(demangled))
+    assert len(demangled) == 2
+    return demangled[0]
 
 def convertUnits(data, units):
     """
@@ -78,10 +111,10 @@ def processNvprofCSV(csvData, kernelMetrics = dict(), ignoreList = [], verbosePr
 
         # see what the name key is
         if "Kernel" in row.keys():
-            kernelName = row["Kernel"]
+            kernelName = demangle(row["Kernel"])
             del row["Kernel"]
         elif "Name" in row.keys():
-            kernelName = row["Name"]
+            kernelName = demangle(row["Name"])
             del row["Name"]
         else:
             raise KeyError("Unable to find Kernal name in csv data: {0}".format(row.keys()))

@@ -174,26 +174,37 @@ rooflineMetrics = ["flop_count_dp",
                    "dram_throughput",
                    "dram_bytes"]
 
-def formatKernel(stringToStrip):
+def formatKernel(stringToStrip, splitParams = False, stripTypes = False, moveEnd = False):
     # strip out parameter list
-    stringToStrip = str.split(stringToStrip, '(')[0]
+    if splitParams:
+        stringToStrip = str.split(stringToStrip, '(')[0]
 
     # get rid of variable types
-    types = re.compile('(void|bool|char|short|int|long|float|double)')
-    stringToStrip = types.sub('', stringToStrip)
+    if stripTypes:
+        types = re.compile('(void |bool |char |short |int |long |float |double |unsigned |signed |const )')
+        stringToStrip = types.sub('', stringToStrip)
+
+    # what's after the last > to the beginning
+    # some frameworks put the actual name towards the
+    # end of a long string (ie RAJA), this prevents it from
+    # getting lost
+    if moveEnd:
+        pos = stringToStrip.rfind(">")
+        if pos > 0:
+            stringToStrip = stringToStrip[pos:] + "_" + stringToStrip[:pos]
 
     # get rid of symbols that will cause issues
-    parens = re.compile('(<|>|\(|\)| |,|=|\*)')
+    parens = re.compile('(<|>|\(|\)| |,|=|\*|:)')
     newString = parens.sub('_', stringToStrip)
     stringToStrip = newString
-    underscores = re.compile('(__|___|____|_____)')
+    underscores = re.compile('(__*)')
     newString = underscores.sub('_', stringToStrip)
-    stringToStrip = newString
-    newSTring = underscores.sub('_', stringToStrip)
-    stringToStrip = newString
-    newSTring = underscores.sub('_', stringToStrip)
+    
+    # strip underscores from beginning and end
     if newString[-1] == "_":
         newString = newString[:-1]
+    if newString[0] == "_":
+        newString = newString[1:]
     return newString
 
 def FormatUnits(value, baseTwo=False, baseUnit=''):
@@ -474,7 +485,13 @@ def generateRooflinesCSV(rooflines, kernelMetrics, modelName):
     for kernel in kernelMetrics:
         for roofline in rooflines:
             if kernel in roofline:
-                csvFileName = modelName + "_" + formatKernel(kernel) + ".csv"
+                formattedName = formatKernel(kernel, stripTypes=True, moveEnd=True)
+                print("Kernel {}".format(formattedName))
+                if len(formattedName) > 200:	
+                    csvFileName = modelName + "_" + formattedName[:150] + ".csv"
+                else:
+                    csvFileName = modelName + "_" + formattedName + ".csv"
+                print("Final name {}".format(csvFileName))
                 with open(csvFileName, 'a', newline='') as csvfile:
                     csvfile.write("{},{},{},{},{}\n".format(rooflines[roofline][0], rooflines[roofline][1] / 1.0e9,
                                                             rooflines[roofline][2], rooflines[roofline][2] / 1.0e9,
@@ -506,15 +523,22 @@ rooflines = generateRooflinePoints(kernelMetrics)
 aspenModelName = os.path.basename(sys.argv[1])
 generateAspenModel(kernelMetrics, aspenModelName, rooflines)
 
+#for kernel in kernelMetrics:
+#    continue
+#    if "Duration" in kernelMetrics[kernel] and kernelMetrics[kernel]["Duration"][0] != "":
+#        print(" duration {}".format(kernelMetrics[kernel]["Duration"]))
+#        duration = statistics.mean(kernelMetrics[kernel]["Duration"])
+#        print("Kernel {} Duration {}".format(kernel, duration))
+#        for metric in rooflineMetrics:
+#            if metric in kernelMetrics[kernel]:
+#                print("{} {}".format(metric, FormatUnits(statistics.mean(kernelMetrics[kernel][metric]))))
+#        for metric in metricNames:
+#       	    if metric in kernelMetrics[kernel]:
+#                print("{}".format(FormatUnits(statistics.mean( kernelMetrics[kernel][metric] ), baseUnit=metric + "/s")))
+
+print("List of kernels")
 for kernel in kernelMetrics:
-    duration = statistics.mean(kernelMetrics[kernel]["Duration"])
-    print("Kernel {} Duration {}".format(kernel, duration))
-    for metric in rooflineMetrics:
-        if metric in kernelMetrics[kernel]:
-            print("{} {}".format(metric, FormatUnits(statistics.mean(kernelMetrics[kernel][metric]))))
-    for metric in metricNames:
-        if metric in kernelMetrics[kernel]:
-            print("{}".format(FormatUnits(statistics.mean( kernelMetrics[kernel][metric] ), baseUnit=metric + "/s")))
+    print("{}".format(kernel))
 
 
 generateRooflinesCSV(rooflines, kernelMetrics, aspenModelName)
